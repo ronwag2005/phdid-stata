@@ -1,0 +1,6 @@
+v 3
+d phdid -- Partial homogeneity in staggered difference-in-differences
+d
+d Rohan Wagle and Parush Arora, Department of Economics, Ashoka University
+d
+p phdid Partial homogeneity in staggered difference-in-differences

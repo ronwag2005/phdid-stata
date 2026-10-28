@@ -1,0 +1,43 @@
+v 3
+d phdid: Partial homogeneity in staggered difference-in-differences
+d
+d  Estimation, specification testing and diagnostics for staggered
+d  difference-in-differences designs in which the cohort-time average
+d  treatment effects are partially homogeneous -- equal within groups of
+d  cohort-time cells, but not across them.  Implements the two estimators
+d  of Arora and Wagle (2026): a Dirichlet process mixture fitted by
+d  collapsed Gibbs sampling, and an l0-penalised partial-homogeneity
+d  estimator with a two-step agglomerative search.  Includes tests for
+d  recoverable heterogeneity, regularisation paths for both estimators,
+d  exact partition enumeration, and sampler diagnostics.
+d
+d  Requires: Stata 17
+d
+d  Distribution-Date: 20261026
+d
+d Authors: Rohan Wagle and Parush Arora, Ashoka University
+d Maintainer: Rohan Wagle
+d Support: email rohan.wagle_ug2023@ashoka.edu.in
+d
+f ado/phdid.ado
+f ado/phdid_setup.ado
+f ado/phdid_parsecells.ado
+f ado/phdid_desc.ado
+f ado/phdid_test.ado
+f ado/phdid_l0.ado
+f ado/phdid_bayes.ado
+f ado/phdid_fit.ado
+f ado/phdid_agg.ado
+f ado/phdid_point.ado
+f ado/phdid_rhat.ado
+f ado/phdid_sens.ado
+f ado/phdid_cov.ado
+f ado/phdid_enum.ado
+f ado/phdid_graph.ado
+f doc/phdid.sthlp
+f doc/phdid_setup.sthlp
+f doc/phdid_test.sthlp
+f doc/phdid_l0.sthlp
+f doc/phdid_bayes.sthlp
+f doc/phdid_postestimation.sthlp
+f src/lphdid.mlib

@@ -1,0 +1,362 @@
+% phdid: partial homogeneity in staggered difference-in-differences
+% Draft article for the Stata Journal.
+%
+% Typeset with the Stata Journal class, which is distributed by the
+% Journal and is not included here:
+%     https://www.stata-journal.com/submissions/
+% Place sj.cls and stata.sty beside this file, then
+%     pdflatex phdid_sj
+%
+% Copyright (c) 2026 Rohan Wagle and Parush Arora.  MIT licensed.
+
+\documentclass{sj}
+\usepackage{amsmath,amssymb,booktabs,graphicx}
+
+\stabstract{%
+In a staggered difference-in-differences design the treatment effect is a
+vector of cohort-time effects, not a single number.  Estimating every one
+separately is unbiased but inefficient when some are in fact equal; pooling
+them into a single two-way fixed-effects coefficient is efficient but biased
+whenever the heterogeneity is genuine.  We describe \texttt{phdid}, which
+treats the choice between these corners as a partition-selection problem on
+the cohort-time cells and implements the two estimators of
+\citet{AroraWagle2026}: a Dirichlet process mixture fitted by collapsed Gibbs
+sampling, and an $\ell_0$-penalised estimator with a two-step agglomerative
+search.  Because the estimators depend on the data only through the
+first-stage coefficient vector and its covariance, \texttt{phdid} works after
+any heterogeneity-robust first stage that posts \texttt{e(b)} and
+\texttt{e(V)}.  The package also provides specification tests for whether a
+partition is recoverable at all, exact partition enumeration for small
+designs, regularisation paths, and sampler diagnostics.}
+
+\title[phdid: Partial homogeneity in staggered DiD]{Partial homogeneity in
+staggered difference-in-differences}
+
+\author{Rohan Wagle\\Department of Economics\\Ashoka University\\Sonipat,
+India\\rohan.wagle\_ug2023@ashoka.edu.in
+\and Parush Arora\\Department of Economics\\Ashoka University\\Sonipat,
+India\\parush.arora@ashoka.edu.in}
+
+\keywords{\inserttag, difference-in-differences, staggered adoption,
+treatment effect heterogeneity, Dirichlet process, partition selection, model
+selection, Bayesian nonparametrics}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+A staggered difference-in-differences design with $G$ treated cohorts and $T$
+periods identifies not one treatment effect but $K$ of them, one per
+cohort-time cell $(g,t)$ with $t \ge g$.  The modern estimators
+\citep{CallawaySantAnna2021,Wooldridge2025} return all $K$, and correctly
+warn against pooling them with a single two-way fixed-effects coefficient when
+the effects differ.
+
+That warning leaves an unanswered question.  The $K$ cell estimates are
+individually noisy, and in applied work many of them are not meaningfully
+different from one another.  Reporting all $K$ is unbiased but wasteful;
+reporting one is efficient but wrong.  The useful object lies between: a
+partition of the cells into $m < K$ groups within which the effects are
+genuinely equal.  \citet{AroraWagle2026} call this \emph{partial homogeneity},
+show that under the true partition the grouped estimator is unbiased and
+strictly more efficient than the flexible one, and give two ways to recover
+the partition when it is unknown.
+
+This article describes \texttt{phdid}, a Stata implementation of both.  The
+package is deliberately a second-stage tool: it does not estimate treatment
+effects from micro data.  Section~\ref{sec:method} explains why that is not a
+limitation but a theorem, and what follows from it for the design of the
+command.
+
+\section{Methods and formulas}
+\label{sec:method}
+
+\subsection{The model}
+
+Let $\tau = (\tau_1,\dots,\tau_K)'$ collect the true cohort-time average
+treatment effects and let $\hat\tau$ be any asymptotically normal first-stage
+estimator with
+\[
+  \hat\tau \;\sim\; \mathcal{N}(\tau, \Sigma),
+\]
+$\Sigma$ the \emph{joint} covariance.  A partition $\mathcal{C} =
+\{C_1,\dots,C_m\}$ of $\{1,\dots,K\}$ imposes $\tau_k = \phi_p$ for all $k \in
+C_p$.  Writing $R$ for the $K \times m$ indicator matrix of $\mathcal{C}$ and
+$\Omega = \Sigma^{-1}$, the restricted generalised least squares fit is
+\begin{equation}
+  \hat\phi = (R'\Omega R)^{-1} R'\Omega\hat\tau,
+  \qquad
+  \hat\tau_{\mathcal{C}} = R\hat\phi,
+  \qquad
+  \widehat{\mathrm{Var}}(\hat\tau_{\mathcal{C}}) = R (R'\Omega R)^{-1} R',
+  \label{eq:gls}
+\end{equation}
+with deviance $D(\mathcal{C}) = \hat\tau'\Omega\hat\tau - \hat\phi'R'\Omega
+\hat\tau$ against the flexible fit.
+
+\subsection{Why the first stage is a sufficient statistic}
+
+Everything in \eqref{eq:gls}, and everything in the marginal likelihood of the
+Bayesian model below, enters only through $R'\Omega\hat\tau$ and $R'\Omega R$.
+This is Lemma~1 of \citet{AroraWagle2026}.  Two first stages that produce the
+same $(\hat\tau, \Sigma)$ therefore produce the same partition posterior,
+whatever micro data lie behind them.
+
+For a Stata package this is an unusually convenient theorem, because
+$(\hat\tau, \Sigma)$ is exactly what every estimation command in Stata already
+posts as \texttt{e(b)} and \texttt{e(V)}.  \texttt{phdid setup} reads those
+and nothing else.  The package therefore composes with \texttt{csdid},
+\texttt{jwdid}, \texttt{did\_imputation}, or a matrix the user assembled
+themselves, with no reimplementation and no assumption about how the first
+stage was computed.
+
+\subsection{Remark 1: the covariance is not diagonal}
+
+Cohort-time cells share units and share the unit and time fixed effects, so
+$\Sigma$ has substantial off-diagonal mass.  Discarding it is not a harmless
+speed-up.  In the design of \citet{AroraWagle2026} it understates the
+posterior variance of aggregates by a factor of about 3.5, and moves
+individual co-clustering probabilities by up to 0.39.  \texttt{phdid} uses the
+exact $\Sigma$ throughout, warns when handed a diagonal one, and provides
+\texttt{phdid covcheck} to quantify the difference on the user's own design.
+
+\subsection{The $\ell_0$-penalised estimator}
+
+The estimator of Appendix~B of \citet{AroraWagle2026} minimises
+$D(\mathcal{C}) + \lambda \,\mathrm{pen}(\mathcal{C})$ in two steps.
+Step~1 is a greedy agglomerative search from $K$ singletons, merging at each
+stage the pair minimising
+\begin{equation}
+  \Delta(A,B) \;=\; \frac{n_A n_B}{n_A + n_B}\,(\bar\tau_A - \bar\tau_B)^2,
+  \label{eq:merge}
+\end{equation}
+with $n$ a precision weight.  Step~2 re-estimates by \eqref{eq:gls} under the
+selected partition.  Step~2 is not cosmetic: the criterion \eqref{eq:merge}
+treats the design as orthogonal, and only the re-estimated fit is best linear
+unbiased when the cells are correlated.
+
+Two implementation choices are exposed rather than buried, because both move
+results.  First, the BIC used to select a point on the path is $D + m\ln n$,
+and the theory does not fix $n$: the $K$ first-stage estimates are the
+observations, while the asymptotics justifying Schwarz's rate run in the
+number of units.  The default $n = K$ reproduces the group counts reported in
+the paper, and \texttt{nbic()} changes it.  Second, the stopping rule compares
+$\Delta(A,B)$ against $\lambda|A||B|$, and the pair product grows as groups
+absorb one another.  The effective per-merge threshold is therefore not
+monotone in the merge order, and some group counts are unreachable by any
+single $\lambda$.  On the application in section~\ref{sec:example} the
+thresholds run $0.079$, $0.686$, $0.397$, $1.350$, $2.765$, $3.571$: no
+$\lambda$ selects five groups.  \texttt{phdid sensitivity, by(m)} walks the
+path one merge at a time instead.
+
+\subsection{The Dirichlet process estimator}
+
+The Bayesian model places a Dirichlet process prior with concentration
+$\alpha$ on the partition and a normal base measure on the group effects, and
+is fitted by collapsed Gibbs sampling, Algorithm~3 of \citet{Neal2000}.  Each
+sweep reassigns one cell at a time with the group effect integrated out; the
+collapsed marginal likelihood under the exact $\Sigma$ is computed by the
+Woodbury identity, equation~(30) of \citet{AroraWagle2026}.
+
+Because the sampler averages over partitions rather than selecting one, its
+intervals include uncertainty about the grouping.  In the paper's simulations
+that buys coverage of $0.79$--$0.81$ against $0.57$--$0.62$ for the $\ell_0$
+estimator when the partition is genuinely uncertain, at essentially no cost
+($0.94$ against $0.95$) when the effects are well separated.  The two
+estimators are not rivals: the $\ell_0$ estimator is the fixed-variance MAP of
+the same model, differing only in the partition prior.
+
+\subsection{Whether a partition is recoverable at all}
+
+Both estimators will partition pure noise if asked to, and their output looks
+no different when they do.  In the second application of
+\citet{AroraWagle2026} the $\ell_0$ estimator splits 138 event-study effects
+into five tidy bands while a randomization test cannot reject a single common
+effect.  \texttt{phdid test} is intended to be run first.  It reports a
+common-effect $\chi^2$ test on the pooled deviance, an excess-dispersion
+heterogeneity share computed against the exact $\Sigma$, and---when placebo
+estimates are supplied---the pre/post noise gauge and within-cell
+randomization test of section~5.2.3 of the paper.  Each block is tagged with
+its provenance, and the command then states a reading in words rather than
+leaving the numbers to speak for themselves.
+
+\section{The \texttt{phdid} command}
+
+\subsection{Syntax}
+
+\begin{stsyntax}
+phdid setup
+\optional{, \underbar{b}(\it{matname}) \underbar{v}(\it{matname})
+cells(\it{namelist}) \underbar{w}eights(\it{matname})
+\underbar{nu}nits(\it{\#}) nowarn}
+\end{stsyntax}
+
+\begin{stsyntax}
+phdid test
+\optional{, pre(\it{matname}) nsim(\it{\#}) nocenter seed(\it{\#})}
+\end{stsyntax}
+
+\begin{stsyntax}
+phdid l0
+\optional{, \underbar{sel}ect(bic\textbar lambda\textbar m)
+\underbar{l}ambda(\it{\#}) m(\it{\#}) nbic(\it{\#})
+\underbar{l}evel(\it{\#}) nopath}
+\end{stsyntax}
+
+\begin{stsyntax}
+phdid bayes
+\optional{, alpha(\it{\#}) mu0(\it{\#}) s0sq(\it{\#}) \underbar{iter}s(\it{\#})
+\underbar{burn}in(\it{\#}) thin(\it{\#}) chains(\it{\#})
+\underbar{marg}inal(exact\textbar diagonal)
+init(singletons\textbar pooled\textbar dispersed)
+\underbar{l}evel(\it{\#}) seed(\it{\#}) nococlust}
+\end{stsyntax}
+
+\begin{stsyntax}
+phdid fit, \underbar{part}ition(\it{numlist})
+\optional{\underbar{l}evel(\it{\#}) notable}
+\end{stsyntax}
+
+Postestimation subcommands are \texttt{aggregate}, \texttt{partition},
+\texttt{rhat}, \texttt{sensitivity}, \texttt{covcheck}, \texttt{enumerate} and
+\texttt{graph}; see the help files for their options.
+
+\subsection{Options}
+
+A full list is in the online help.  The options that change results rather
+than presentation are \texttt{nbic()} and \texttt{select()} for
+\texttt{phdid l0}; \texttt{alpha()}, \texttt{mu0()}, \texttt{s0sq()} and
+\texttt{marginal()} for \texttt{phdid bayes}; and \texttt{weights()} for
+\texttt{phdid setup}, which affects every aggregate but nothing about the
+partition posterior.
+
+\subsection{Stored results}
+
+\texttt{phdid l0}, \texttt{phdid bayes} and \texttt{phdid fit} are
+\texttt{eclass} and post \texttt{e(b)} and \texttt{e(V)} over the $K$ cell
+effects, so \texttt{lincom}, \texttt{nlcom}, \texttt{test} and
+\texttt{estimates} work on them without special handling.  After
+\texttt{phdid bayes}, \texttt{e(V)} is the posterior covariance across draws
+and therefore already includes uncertainty about the partition; after
+\texttt{phdid l0} and \texttt{phdid fit} it is the restricted GLS covariance,
+which does not.  The posterior draws themselves are left in Mata, which is
+what \texttt{phdid aggregate} reads in order to apply each aggregator
+draw-by-draw rather than to the posterior mean.
+
+\section{Example}
+\label{sec:example}
+
+We reproduce the first application of \citet{AroraWagle2026}, on the
+county-level minimum-wage panel of \citet{CallawaySantAnna2021}.  The first
+stage is \texttt{csdid}; any heterogeneity-robust estimator would serve.
+
+\begin{stlog}
+. csdid lemp, ivar(countyreal) time(year) gvar(first_treat) ///
+>     method(dripw) notyet
+. phdid setup
+. phdid test
+\end{stlog}
+
+The test reports $\chi^2(6) = 25.29$ with $p = 0.0003$, a heterogeneity share
+of 80\% and a signal-to-noise ratio of 2.24, and reads this as recoverable
+heterogeneity.  The $\ell_0$ estimator then selects four groups:
+
+\begin{stlog}
+. phdid l0
+. phdid aggregate
+\end{stlog}
+
+giving an overall effect of $-0.0388$ with a 95\% interval of $[-0.0614,
+-0.0162]$, conditional on that partition.  Averaging over partitions instead,
+
+\begin{stlog}
+. set seed 20260301
+. phdid bayes, alpha(1) iters(20000) burnin(2000) chains(4) init(dispersed)
+. phdid rhat
+. phdid aggregate
+\end{stlog}
+
+gives $-0.0238$ with $[-0.0476, -0.0000]$ and a posterior mean of 2.20 groups.
+The two differ because the $\ell_0$ interval conditions on a partition that
+carries little posterior mass; the co-clustering matrix, drawn by
+\texttt{phdid graph coclust}, shows which pairs of cells the data really do
+bind together and which the point partition merely happened to join.
+
+With only seven cells the posterior can be computed exactly:
+
+\begin{stlog}
+. phdid enumerate, alpha(1)
+\end{stlog}
+
+enumerating all $B_7 = 877$ partitions and returning a posterior mean of
+$2.1953$ groups and an overall effect of $-0.0240$ with $[-0.0477, -0.0003]$.
+That the sampler reproduced these is the check in section~\ref{sec:valid}.
+
+\section{Validation}
+\label{sec:valid}
+
+An R package of the same name, implementing the same estimators, is on CRAN.
+Everything the estimators do is deterministic given $(\hat\tau, \Sigma)$
+except the Gibbs sampler, and Stata's random-number generator is not R's, so
+\texttt{phdid} is certified in two layers.
+
+The deterministic parts---the restricted GLS fit, the agglomeration path, BIC
+selection, the specification test, and the exact partition posterior by
+enumeration---are certified against the R package to machine precision, using
+143 reference values written at 17 significant figures.  The Gibbs sampler is
+certified against the exact posterior from enumeration, which both languages
+compute deterministically and which is the sampler's own target.  That is the
+correct benchmark: reproducing R's draws would be meaningless, while
+reproducing R's posterior is not.
+
+The certification script, \texttt{cert/phdid\_cert.do}, also checks invariants
+that do not depend on R: relabelling a partition does not change the fit,
+aggregation weights are a partition of unity within each term, grouping never
+raises a cell's sampling variance, and a coarser partition never fits better.
+It runs 165 checks.
+
+\section{Acknowledgements}
+
+The methods are joint work by both authors.  Rohan Wagle maintains the
+package.  We thank the authors of \texttt{csdid} and \texttt{drdid}, on which
+the examples depend.
+
+\section{References}
+
+\begin{phang}
+Arora, P., and R. Wagle. 2026. A Bayesian approach to partial homogeneity in
+staggered difference-in-difference. Ashoka University Economics Discussion
+Paper 166. Also SSRN Working Paper 7207083,
+\url{https://doi.org/10.2139/ssrn.7207083}.
+\end{phang}
+
+\begin{phang}
+Callaway, B., and P. H. C. Sant'Anna. 2021. Difference-in-differences with
+multiple time periods. \emph{Journal of Econometrics} 225: 200--230.
+\end{phang}
+
+\begin{phang}
+Neal, R. M. 2000. Markov chain sampling methods for Dirichlet process mixture
+models. \emph{Journal of Computational and Graphical Statistics} 9: 249--265.
+\end{phang}
+
+\begin{phang}
+Wade, S., and Z. Ghahramani. 2018. Bayesian cluster analysis: Point estimation
+and credible balls. \emph{Bayesian Analysis} 13: 559--626.
+\end{phang}
+
+\begin{phang}
+Wooldridge, J. M. 2025. Two-way fixed effects, the two-way Mundlak regression,
+and difference-in-differences estimators. \emph{Empirical Economics} 69:
+2545--2587.
+\end{phang}
+
+\aboutauthors
+
+Rohan Wagle is an undergraduate in the Department of Economics at Ashoka
+University.  He maintains \texttt{phdid} for both Stata and R.
+
+Parush Arora is in the Department of Economics at Ashoka University.
+
+\end{document}
