@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.1.0  26oct2026}{...}
+{* *! version 0.1.0  29oct2026}{...}
 {vieweralsosee "[R] estimation" "help estcom"}{...}
 {vieweralsosee "phdid setup" "help phdid_setup"}{...}
 {vieweralsosee "phdid l0" "help phdid_l0"}{...}
@@ -85,8 +85,15 @@ Each subcommand has its own help file; see
 {pstd}
 {cmd:phdid} implements the two estimators, the specification tests and the
 diagnostics of Arora and Wagle (2026) for staggered difference-in-differences
-designs in which the cohort-time average treatment effects are {it:partially
-homogeneous}: equal within groups of cells, but not across them.
+designs in which the cohort-time average treatment effects are partially
+homogeneous -- equal within groups of cells, but not across them.
+
+{pstd}
+In practice you run {helpb phdid_setup:phdid setup} once to read in a first
+stage, {helpb phdid_test:phdid test} to ask whether the data can support a
+grouping at all, and then {helpb phdid_l0:phdid l0} for a single grouping to
+report or {helpb phdid_bayes:phdid bayes} for inference that does not assume
+the grouping is known.  Everything else is post-estimation.
 
 {pstd}
 The package does not estimate treatment effects from micro data.  It takes a
@@ -148,6 +155,10 @@ inference.
 
 {marker subcommands}{...}
 {title:Subcommands}
+
+{pstd}
+These are listed in the order you would use them: read in a first stage, ask
+whether there is heterogeneity to recover, estimate, then report.
 
 {synoptset 24 tabbed}{...}
 {synopthdr:subcommand}
@@ -217,24 +228,55 @@ is what {cmd:phdid bayes} is for.
 {marker examples}{...}
 {title:Examples}
 
-{pstd}The paper's first application, from Callaway and Sant'Anna (2021):{p_end}
+{pstd}
+What follows is the paper's first application -- the effect of state
+minimum-wage increases on county-level teen employment, using the panel of
+Callaway and Sant'Anna (2021) -- worked through in the order the paper
+presents it.  Each block is one step of that argument, and the numbers it
+prints are the numbers reported in the paper, so running it end to end also
+confirms the installation is sound.  The same sequence, with fuller comments,
+is {bf:examples/mpdta.do} in the package source.
+
+{pstd}
+{bf:The first stage.}  {cmd:phdid} does not touch the micro data.
+{cmd:csdid} estimates the {it:K} cohort-time effects and their joint
+covariance, and {cmd:phdid setup} reads those out of {cmd:e(b)} and
+{cmd:e(V)} and keeps the post-treatment cells.  Any first stage that posts
+the two would serve here.{p_end}
 
 {phang2}{cmd:. webuse set https://friosavila.github.io/playingwithstata/drdid/}{p_end}
 {phang2}{cmd:. webuse mpdta, clear}{p_end}
 {phang2}{cmd:. csdid lemp, ivar(countyreal) time(year) gvar(first_treat) method(dripw) notyet}{p_end}
 {phang2}{cmd:. phdid setup}{p_end}
 
-{pstd}Is there anything to recover?{p_end}
+{pstd}
+{bf:Is there anything to recover?}  Both estimators will partition pure noise
+if asked to, so this question comes before any estimation.  The test compares
+the flexible fit against a single common effect and reports how much of the
+spread across cells is signal rather than sampling error.{p_end}
 
 {phang2}{cmd:. phdid test}{p_end}
 
-{pstd}One partition to report:{p_end}
+{pstd}
+{bf:One grouping to report.}  {cmd:phdid l0} walks the agglomeration path and
+selects a partition by BIC.  {cmd:phdid aggregate} collapses the grouped cell
+effects into the overall ATT, and {cmd:phdid graph groups} draws the grouped
+estimate against the flexible one for each cell, which is where the gain in
+precision becomes visible.{p_end}
 
 {phang2}{cmd:. phdid l0}{p_end}
 {phang2}{cmd:. phdid aggregate}{p_end}
 {phang2}{cmd:. phdid graph groups}{p_end}
 
-{pstd}Inference that does not assume the partition is known:{p_end}
+{pstd}
+{bf:Inference that does not assume the grouping is known.}  The intervals
+above condition on the selected partition being the right one.
+{cmd:phdid bayes} samples partitions instead, so its intervals carry the
+uncertainty about the grouping itself.  {cmd:phdid rhat} checks that the four chains have
+mixed before any of it is believed; {cmd:phdid aggregate dynamic} reports the
+event-study profile, averaging cells by time since treatment; and
+{cmd:phdid graph coclust} shows, for every pair of cells, the posterior
+probability that the two belong to the same group.{p_end}
 
 {phang2}{cmd:. set seed 20260301}{p_end}
 {phang2}{cmd:. phdid bayes, alpha(1) iters(20000) burnin(2000) chains(4) init(dispersed)}{p_end}
@@ -242,11 +284,20 @@ is what {cmd:phdid bayes} is for.
 {phang2}{cmd:. phdid aggregate dynamic}{p_end}
 {phang2}{cmd:. phdid graph coclust}{p_end}
 
-{pstd}How much of that is the prior talking?{p_end}
+{pstd}
+{bf:How much of that is the prior talking?}  The concentration parameter
+{cmd:alpha} governs how readily the prior opens a new group, and it is not
+estimated from the data.  This traces every cell's estimate across a range of
+it; a conclusion that holds across the whole range is not an artefact of the
+prior.{p_end}
 
 {phang2}{cmd:. phdid sensitivity, alpha(0.25 0.5 1 2 4 8) type(cells)}{p_end}
 
-{pstd}On a design this small the posterior can be computed exactly:{p_end}
+{pstd}
+{bf:The exact posterior, for comparison.}  With {it:K} this small all 877
+partitions of the cells can be enumerated, so the posterior can be computed
+without sampling at all.  This is the benchmark the sampler is certified
+against, and on a design of this size it is the answer to prefer.{p_end}
 
 {phang2}{cmd:. phdid enumerate, alpha(1)}{p_end}
 
