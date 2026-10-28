@@ -13,13 +13,14 @@ d  exact partition enumeration, and sampler diagnostics.
 d
 d  Requires: Stata 17
 d
-d  Distribution-Date: 20261026
+d  Distribution-Date: 20261028
 d
 d Authors: Rohan Wagle and Parush Arora, Ashoka University
 d Maintainer: Rohan Wagle
 d Support: email rohan.wagle_ug2023@ashoka.edu.in
 d
 f ado/phdid.ado
+f ado/phdid_mata.ado
 f ado/phdid_setup.ado
 f ado/phdid_parsecells.ado
 f ado/phdid_desc.ado
@@ -40,4 +41,7 @@ f doc/phdid_test.sthlp
 f doc/phdid_l0.sthlp
 f doc/phdid_bayes.sthlp
 f doc/phdid_postestimation.sthlp
-f src/lphdid.mlib
+f src/phdid_core.mata
+f src/phdid_drivers.mata
+f src/phdid_bayes.mata
+f src/phdid_post.mata

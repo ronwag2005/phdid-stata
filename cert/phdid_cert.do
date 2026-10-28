@@ -23,26 +23,19 @@ set linesize 100
 * the fixtures carry 17 significant figures; import delimited would
 * otherwise store them as floats and throw away nine of them
 set type double
+* the SSC archive asks that submitted programs be tested with variable
+* abbreviation disabled, so the certification runs that way
+set varabbrev off
 
 local here "`c(pwd)'"
 adopath ++ "`here'/ado"
 adopath ++ "`here'/src"
 
-* Certify what is shipped.  The compiled library is what an installed
-* copy runs from; the .mata sources are only a fallback for a working
-* tree where build.do has not been run yet.
-capture confirm file "`here'/src/lphdid.mlib"
-if (_rc == 0) {
-    mata: mata mlib index
-    di as txt "certifying the compiled library src/lphdid.mlib"
-}
-else {
-    foreach f in core drivers bayes post {
-        qui do "`here'/src/phdid_`f'.mata"
-    }
-    di as err "src/lphdid.mlib not found; certifying the Mata sources instead"
-    di as txt "run {bf:do build.do} and certify again before releasing"
-}
+* Certify what is shipped, through the path an installed copy takes:
+* phdid_mata finds the Mata sources on the adopath and compiles them.
+phdid_mata
+di as txt "certifying the Mata sources in src/, ABI " _c
+mata: phdid_abi()
 
 * ------------------------------------------------------------------
 * assertion helper

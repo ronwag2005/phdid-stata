@@ -81,6 +81,20 @@ Partial Homogeneity in Staggered Difference-in-Difference"
   which would interpolate between grid points and imply a continuum between
   cohort-time cells that does not exist.
 
+## Installation and the Mata core
+
+* The numerical core ships as Mata source (`src/*.mata`) and is compiled into
+  the session on first use by `phdid_mata`, which takes about 0.01 seconds and
+  is skipped once the functions are in memory. Earlier development builds
+  shipped a byte-compiled `lphdid.mlib` instead. A Mata library cannot be read
+  by a Stata older than the one that wrote it, so a prebuilt library would have
+  installed cleanly and then failed every command with `r(3499)` for anyone on
+  a Stata older than the build machine's, while the package advertised Stata
+  17. Compiling from source removes the ceiling and the need for a build step.
+* `phdid_mata` restores `matastrict` to the user's own setting after compiling,
+  and exits with `r(601)` and an explicit message if a source file is missing
+  from the installation.
+
 ## Notes on choices that move results
 
 * The BIC penalty on the two-stage route needs a sample size that the theory

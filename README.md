@@ -26,7 +26,8 @@ net install phdid, from("https://raw.githubusercontent.com/ronwag2005/phdid-stat
 ```
 
 Requires Stata 17 or later. There are no other dependencies: the numerical
-core is Mata, compiled into `lphdid.mlib`, with no external plugins.
+core is Mata, compiled into the session on first use, with no external
+plugins.
 
 To run the examples you will also want a heterogeneity-robust first-stage
 command such as [`csdid`](https://github.com/friosavila/stpackages).
@@ -166,14 +167,15 @@ partition does not change the fit, aggregation weights are a partition of
 unity, grouping never raises a cell's sampling variance, and a coarser
 partition never fits better.
 
-## Building from source
+## The Mata core
 
-```stata
-do build.do      // compiles src/*.mata into src/lphdid.mlib
-```
-
-The `.mata` sources ship for inspection and for certification; an installed
-copy runs from the compiled library.
+The numerical work is in four Mata source files under `src/`. They are not
+shipped as a byte-compiled library (`.mlib`): a library written by one Stata
+cannot be read by an older one, so a prebuilt library would silently break
+every command for anyone running a Stata older than the build machine's.
+`phdid_mata` compiles the sources into the session instead, on first use,
+which takes about a hundredth of a second and works on any Stata from 17 on.
+Nothing needs building before use or after a change to `src/`.
 
 ## Authorship and citation
 

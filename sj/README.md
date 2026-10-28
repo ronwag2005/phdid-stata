@@ -25,8 +25,7 @@ place them beside `phdid_sj.tex`, and run `pdflatex phdid_sj` twice.
 
 ## Before submitting
 
-1. `do build.do` — rebuild `src/lphdid.mlib` from the Mata sources.
-2. `do cert/phdid_cert.do` — must report all checks passed.
-3. `do examples/mpdta.do` — must run clean and produce the numbers quoted in
+1. `do cert/phdid_cert.do` — must report all checks passed.
+2. `do examples/mpdta.do` — must run clean and produce the numbers quoted in
    section 4 of the article.
-4. Regenerate any figures included in the article from `examples/mpdta.do`.
+3. Regenerate any figures included in the article from `examples/mpdta.do`.

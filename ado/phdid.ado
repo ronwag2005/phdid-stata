@@ -11,6 +11,9 @@ program define phdid
         exit 198
     }
 
+    * the Mata core is compiled on first use in the session
+    phdid_mata
+
     if ("`sub'" == "setup") {
         phdid_setup `0'
         exit

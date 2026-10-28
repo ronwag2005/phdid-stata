@@ -8,6 +8,20 @@ mata: mata set matastrict on
 mata:
 
 // =====================================================================
+// SESSION PROBE
+//
+// phdid_mata.ado calls this to find out whether the library is already
+// compiled in the session.  The number is an interface generation, to
+// be bumped only if a future release changes a function signature that
+// the ado-files call.
+// =====================================================================
+
+real scalar phdid_abi()
+{
+    return(1)
+}
+
+// =====================================================================
 // PARTITION HANDLING
 //
 // A partition of the K cohort-time cells is an integer column vector z
