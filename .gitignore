@@ -4,3 +4,4 @@
 *.gph
 .DS_Store
 *.mlib
+dist/
