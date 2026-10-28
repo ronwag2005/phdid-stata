@@ -14,7 +14,7 @@ problem** on the cells, and implements the two estimators of Arora and Wagle
 needed to know whether either should be used at all.
 
 This is the Stata implementation. An R package of the same name, with the same
-estimators, is on CRAN. The two are certified against each other: see
+estimators, is on CRAN. The two have been certified against each other: see
 [Validation](#validation).
 
 ---
@@ -149,9 +149,8 @@ certified in two layers:
 
 - **The deterministic parts** — the restricted GLS fit, the agglomeration
   path, BIC selection, the specification test, and the exact partition
-  posterior by enumeration — are certified against the CRAN R package to
-  machine precision, using 143 reference values written at 17 significant
-  figures.
+  posterior by enumeration — are certified against the CRAN R package,
+  using 143 reference values written at 17 significant figures.
 - **The Gibbs sampler** is certified against the exact partition posterior
   from full enumeration, which both languages compute deterministically and
   which is the sampler's own target. That is the right benchmark: reproducing
